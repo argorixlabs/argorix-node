@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.0 - 2026-08-02
+
+- Rebase sobre el árbol de producción. La 0.2.0 se armó desde un respaldo del repo con
+  cuatro meses de atraso; para este paquete la única diferencia real era el prefijo
+  `/v1`, que la 0.2.0 ya emitía, así que no hay cambios de API.
+- La 0.2.0 nunca llegó a publicarse en npm: los intentos fallaron primero por el tipo de
+  token y después porque npm está restringiendo los tokens que saltan 2FA. `@argorix/sdk`
+  0.3.0 es, entonces, la primera versión publicada bajo el nombre nuevo.
+- Se numera 0.3.0 para quedar alineado con `argorix-guardrails` y
+  `argorix-guardrails-agent`, que sí venían de esa corrección.
+
 ## 0.2.0 - 2026-08-01
 
 ### Rebranding
