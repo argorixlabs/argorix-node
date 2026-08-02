@@ -1,0 +1,57 @@
+{
+  "name": "@argorix/sdk",
+  "version": "0.2.0",
+  "description": "Official Argorix SDK for Node.js and TypeScript runtimes",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "clean": "rimraf dist",
+    "prepublishOnly": "npm run clean && npm run build",
+    "pretest": "npm run build",
+    "test": "node --test test/*.test.mjs"
+  },
+  "keywords": [
+    "argorix",
+    "ai-governance",
+    "governance",
+    "ai",
+    "guardrails",
+    "agents",
+    "security",
+    "sdk"
+  ],
+  "author": "Argorix",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/argorixlabs/argorix-node.git"
+  },
+  "homepage": "https://github.com/argorixlabs/argorix-node#readme",
+  "bugs": {
+    "url": "https://github.com/argorixlabs/argorix-node/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "rimraf": "^6.0.1",
+    "typescript": "^5.9.3"
+  }
+}
