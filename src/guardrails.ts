@@ -4,10 +4,13 @@ import type {
   ApplyPayload,
   GuardrailsConfig,
   GuardrailsDecision,
+  GuardrailsDecisionKind,
   GuardrailsEngine,
   GuardrailsEvaluation,
+  GuardrailsEvaluatorError,
   GuardrailsFinding,
   GuardrailsMode,
+  GuardrailsOutcome,
   GuardrailsStage,
   GuardrailsState,
   HeartbeatPayload,
@@ -110,6 +113,19 @@ export function toGuardrailsDecision(
     appNumber: asNumber(payload.app_number),
     repository: asString(payload.repository),
     serverTime: asString(payload.server_time),
+    decision: (asString(payload.decision) ?? (allowed ? "allow" : "deny")) as GuardrailsDecisionKind,
+    outcome: (asString(payload.outcome) ?? "policy_match") as GuardrailsOutcome,
+    reasonCode: asString(payload.reason_code) ?? "",
+    reason: asString(payload.reason) ?? "",
+    eventId: asString(payload.event_id) ?? "",
+    requestId: asString(payload.request_id) ?? "",
+    failClosed: Boolean(payload.fail_closed),
+    degraded: Boolean(payload.degraded),
+    errors: Array.isArray(payload.errors) ? (payload.errors as GuardrailsEvaluatorError[]) : [],
+    runtimeEvidence:
+      payload.runtime_evidence && typeof payload.runtime_evidence === "object"
+        ? (payload.runtime_evidence as Record<string, unknown>)
+        : null,
     raw: payload,
   };
 }
@@ -250,6 +266,16 @@ export class ArgorixClient {
       })),
       metadata: payload.metadata ?? {},
       telemetry: (payload.includeTelemetry ?? true) ? this.telemetry : undefined,
+      // Descriptores de la decision: viajan a la evidencia firmada y no cambian
+      // el veredicto. Se omiten cuando no se pasan, para que un servidor
+      // anterior a este contrato siga aceptando el cuerpo.
+      ...(payload.requestId ? { request_id: payload.requestId } : {}),
+      ...(payload.agentId ? { agent_id: payload.agentId } : {}),
+      ...(payload.endpoint ? { endpoint: payload.endpoint } : {}),
+      ...(payload.step ? { step: payload.step } : {}),
+      ...(payload.actor ? { actor: payload.actor } : {}),
+      ...(payload.model ? { model: payload.model } : {}),
+      ...(payload.includeEvidence ? { include_evidence: true } : {}),
     };
   }
 
@@ -261,7 +287,13 @@ export class ArgorixClient {
     this.latencyMsAcc += Date.now() - startedAt;
   }
 
-  /** Evaluate text (and optional tool calls) against the active guardrails. */
+  /**
+   * Evaluate text (and optional tool calls) against the active guardrails.
+   *
+   * Read `decision`, not only `allowed`: `allow` and `transform` both allow, but
+   * `transform` means the text changed and `outputText` is the one to use. On
+   * `deny` the text is withheld and `outputText` comes back empty.
+   */
   async evaluate(text: string, payload: ApplyPayload = {}): Promise<GuardrailsDecision> {
     const started = Date.now();
     const response = await this.transport.requestJson(

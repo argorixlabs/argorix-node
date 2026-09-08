@@ -174,6 +174,105 @@ test("evaluate retries transient failures and sends auth and user-agent headers"
   }
 });
 
+test("evaluate exposes the decision contract", async () => {
+  const runtime = await startServer([
+    {
+      status: 200,
+      body: {
+        ...EVALUATE_BODY,
+        decision: "deny",
+        outcome: "policy_match",
+        reason_code: "policy:deny",
+        reason: "Blocked because a critical finding matched.",
+        event_id: "evt-1",
+        request_id: "req-1",
+        fail_closed: false,
+        degraded: false,
+        errors: [],
+        output_text: "",
+        runtime_evidence: { decision: "DENY", model: { invoked: false } },
+      },
+    },
+  ]);
+
+  try {
+    const client = buildClient(runtime.baseUrl);
+    const decision = await client.evaluate("hello world");
+
+    assert.equal(decision.decision, "deny");
+    assert.equal(decision.outcome, "policy_match");
+    assert.equal(decision.reasonCode, "policy:deny");
+    assert.equal(decision.requestId, "req-1");
+    assert.equal(decision.outputText, "");
+    assert.equal(decision.runtimeEvidence.model.invoked, false);
+  } finally {
+    runtime.server.close();
+  }
+});
+
+test("an absent policy is an allow, not a block", async () => {
+  const runtime = await startServer([
+    {
+      status: 200,
+      body: {
+        ...EVALUATE_BODY,
+        allowed: true,
+        decision: "allow",
+        outcome: "policy_not_applicable",
+        reason_code: "policy:not_applicable",
+        findings: [],
+        runtime_evidence: null,
+      },
+    },
+  ]);
+
+  try {
+    const client = buildClient(runtime.baseUrl);
+    const decision = await client.evaluate("hola");
+
+    assert.equal(decision.allowed, true);
+    assert.equal(decision.outcome, "policy_not_applicable");
+    assert.equal(decision.runtimeEvidence, null);
+  } finally {
+    runtime.server.close();
+  }
+});
+
+test("evidence descriptors are sent, and omitted when unset", async () => {
+  const runtime = await startServer([
+    { status: 200, body: EVALUATE_BODY },
+    { status: 200, body: EVALUATE_BODY },
+  ]);
+
+  try {
+    const client = buildClient(runtime.baseUrl);
+    await client.evaluate("hello world", {
+      agentId: "industry_support",
+      endpoint: "/industry/assistant",
+      step: { type: "llm", name: "industry.request" },
+      actor: { type: "human", id: "presenter" },
+      model: { provider: "openai", name: "gpt-4.1-mini" },
+      requestId: "req-industry-1",
+      includeEvidence: true,
+    });
+    await client.evaluate("hello world");
+
+    const described = runtime.requests[0].payload;
+    assert.equal(described.agent_id, "industry_support");
+    assert.equal(described.endpoint, "/industry/assistant");
+    assert.deepEqual(described.step, { type: "llm", name: "industry.request" });
+    assert.equal(described.request_id, "req-industry-1");
+    assert.equal(described.include_evidence, true);
+
+    const plain = runtime.requests[1].payload;
+    for (const key of ["agent_id", "endpoint", "step", "actor", "model", "include_evidence"]) {
+      assert.equal(key in plain, false);
+    }
+  } finally {
+    runtime.server.close();
+  }
+});
+
 test("apply remains an alias of evaluate", async () => {
   const runtime = await startServer([{ status: 200, body: EVALUATE_BODY }]);
 

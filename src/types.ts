@@ -28,6 +28,28 @@ export type EffectiveScope = {
 
 export type GuardrailsConfig = Record<string, unknown>;
 
+/** What to do with the text. `transform` allows, but the text changed. */
+export type GuardrailsDecisionKind = "allow" | "transform" | "deny";
+
+/**
+ * Why the evaluation ended where it did. A policy that never ran and a policy
+ * that ran and found nothing both allow; only this tells them apart.
+ */
+export type GuardrailsOutcome =
+  | "policy_match"
+  | "policy_not_applicable"
+  | "evaluator_error"
+  | "authentication_error"
+  | "configuration_error";
+
+/** A validator that could not answer. Never a finding. */
+export type GuardrailsEvaluatorError = {
+  id: string;
+  title: string;
+  reason: string;
+  evaluation_engine?: string | null;
+};
+
 export type GuardrailsDecision = {
   allowed: boolean;
   blocked: boolean;
@@ -44,6 +66,19 @@ export type GuardrailsDecision = {
   appNumber: number | null;
   repository: string | null;
   serverTime: string | null;
+  decision: GuardrailsDecisionKind;
+  outcome: GuardrailsOutcome;
+  reasonCode: string;
+  reason: string;
+  eventId: string;
+  requestId: string;
+  /** True only when a denial came from an evaluator failure under a fail-closed policy. */
+  failClosed: boolean;
+  /** True when the evaluation completed with less engine than configured. */
+  degraded: boolean;
+  errors: GuardrailsEvaluatorError[];
+  /** Signed record of the decision, when the server attached one. */
+  runtimeEvidence: Record<string, unknown> | null;
   /** The untouched API payload, so fields added later stay reachable. */
   raw: Record<string, unknown>;
 };
@@ -88,6 +123,20 @@ export type ApplyPayload = {
   toolCalls?: GuardrailsToolCall[];
   metadata?: Record<string, RuntimeEventMetadataValue>;
   includeTelemetry?: boolean;
+  /** End-to-end correlation id. One is minted server-side when omitted. */
+  requestId?: string;
+  /**
+   * Descriptive labels that travel into the signed evidence record and are
+   * marked there as declared by the caller. None of them changes the verdict,
+   * and none of them resolves Agent Guardrails controls.
+   */
+  agentId?: string;
+  endpoint?: string;
+  step?: { type?: string; name?: string };
+  actor?: { type?: string; id?: string };
+  model?: { provider?: string; name?: string };
+  /** Ask for the signed evidence even when the decision is a plain allow. */
+  includeEvidence?: boolean;
 };
 
 export type RuntimeEventPayload = {

@@ -51,7 +51,7 @@ import { ArgorixClient, ArgorixError } from "@argorix/sdk";
 const client = new ArgorixClient({
   baseUrl: "https://api.argorix.com",
   appNumber: 123456,
-  appApiKey: "ax_live_replace_me",
+  appApiKey: "ga_live_replace_me",
   timeoutMs: 10_000,
   maxRetries: 2,
 });
@@ -89,17 +89,67 @@ valores a mano.
 
 ## Flujo runtime clásico
 
+Dos llamadas por turno: una antes de invocar el modelo y otra antes de entregar su
+respuesta. `outputText` es el texto que hay que usar — en un `transform` no es el que
+enviaste.
+
 ```ts
 const inbound = await client.evaluate(userPrompt, { stage: "input" });
 if (inbound.blocked) {
+  // El modelo no se invoca. inbound.runtimeEvidence trae el registro firmado.
   return new Response("blocked", { status: 403 });
 }
 
-const reply = await llm.invoke(userPrompt);
+const reply = await llm.invoke(inbound.outputText);
 
 const outbound = await client.evaluate(reply, { stage: "output" });
+if (outbound.blocked) {
+  return new Response("blocked", { status: 403 });
+}
 return new Response(outbound.outputText);
 ```
+
+### Leer la decisión
+
+HTTP 200 significa que la evaluación se procesó, no que el texto sea seguro. Hay tres
+preguntas distintas y tres campos que las responden:
+
+| Campo | Responde | Valores |
+| --- | --- | --- |
+| `decision` | qué hacer con el texto | `allow`, `transform`, `deny` |
+| `outcome` | sobre qué base se decidió | `policy_match`, `policy_not_applicable`, `evaluator_error`, `configuration_error` |
+| `reasonCode` | el detalle estable | `policy:allow`, `policy:transform`, `policy:deny`, `policy:monitored`, `policy:not_applicable`, `runtime_error:evaluator_failed`, `config:evaluation_engine_unavailable` |
+
+Dos cosas que no ocurren, y que conviene no programar defensivamente:
+
+- **Sin política aplicable no hay bloqueo.** Guardrails apagados, ningún validador activo
+  o un request sin nada que evaluar devuelven `allowed: true` con
+  `reasonCode: "policy:not_applicable"`.
+- **Un evaluador caído no bloquea** salvo que la aplicación esté configurada
+  `fail_closed`. Cuando falla, los validadores afectados llegan en `errors`, los
+  detectores deterministas deciden igual, y `degraded` queda en `true`.
+
+### Evidencia firmada
+
+`runtimeEvidence` es el registro de la decisión, emitido durante la evaluación y sellado
+con un digest recomputable más una firma HMAC-SHA256. Viaja en `deny`, en `transform`,
+cuando hay hallazgos, o siempre que pidas `includeEvidence: true`.
+
+```ts
+const decision = await client.evaluate(userPrompt, {
+  stage: "input",
+  agentId: "industry_support",
+  endpoint: "/industry/assistant",
+  step: { type: "llm", name: "industry.request" },
+  actor: { type: "human", id: "presenter" },
+  model: { provider: "openai", name: "gpt-4.1-mini" },
+  requestId,
+});
+```
+
+Esos descriptores no cambian el veredicto: viajan al registro, que los marca en
+`attestation.caller_declared` — ARGORIX los repite, no los atestigua. Lo que sí observa
+el servidor, `model.invoked` incluido, va en `attestation.server_observed`.
 
 ### Tool calls
 
@@ -163,7 +213,8 @@ Ver [`examples/agent-guardrails.ts`](./examples/agent-guardrails.ts).
 `GuardrailsDecision`: `allowed`, `blocked`, `outputText`, `mode`, `findings`,
 `evaluations`, `selectedValidators`, `effectiveScope`, `guardrailsConfig`,
 `guardrailsEngine`, `stage`, `applicationId`, `appNumber`, `repository`, `serverTime`,
-`raw`.
+`decision`, `outcome`, `reasonCode`, `reason`, `eventId`, `requestId`, `failClosed`,
+`degraded`, `errors`, `runtimeEvidence`, `raw`.
 
 `GuardrailsState`: `applicationId`, `appNumber`, `repository`, `installationConnected`,
 `guardrailsConfig`, `effectiveScope`, `selectedValidators`, `mode`, `enabled`,

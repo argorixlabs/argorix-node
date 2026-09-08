@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.0 - 2026-09-08
+
+- The shim now depends on `@argorix/sdk` ^0.4.0, which exposes the full guardrails
+  decision (`decision`, `outcome`, `reasonCode`, `runtimeEvidence`) alongside `allowed`.
+- 0.2.0 and 0.3.0 were prepared but never published to npm: installing
+  `@governanceai/sdk` still resolves to the pre-rebrand 0.1.0, not to this shim.
+
 ## 0.2.0 - 2026-08-01
 
 - Deprecated in favour of `@argorix/sdk` following the Governance AI → Argorix rebrand.

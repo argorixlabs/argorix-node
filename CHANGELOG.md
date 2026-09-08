@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.4.0 - 2026-09-08
+
+### Contrato de decision de Classic Guardrails
+
+Aditivo: nada de lo que ya funcionaba cambia de forma. `GuardrailsDecision` expone ahora
+la decision completa en lugar de solo `allowed`:
+
+- `decision` (`allow` / `transform` / `deny`) y `outcome`
+  (`policy_match`, `policy_not_applicable`, `evaluator_error`, `configuration_error`,
+  `authentication_error`). La ausencia de politica aplicable es `policy_not_applicable`
+  y siempre permite; un evaluador caido es `evaluator_error` y solo deniega si la
+  aplicacion esta configurada fail-closed.
+- `reasonCode`, `reason`, `eventId`, `requestId`, `failClosed`, `degraded`, `errors` y
+  `runtimeEvidence` (el registro firmado de la decision, cuando el servidor lo adjunta).
+
+`ApplyPayload` acepta descriptores opcionales que viajan a la evidencia y no cambian el
+veredicto: `requestId`, `agentId`, `endpoint`, `step`, `actor`, `model`, mas
+`includeEvidence` para pedir el recibo tambien en un `allow`. Se omiten del cuerpo cuando
+no se pasan, asi que un servidor anterior a este contrato sigue aceptando el request.
+
+
 ## 0.3.0 - 2026-08-02
 
 - Rebase sobre el árbol de producción. La 0.2.0 se armó desde un respaldo del repo con

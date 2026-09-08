@@ -1,6 +1,6 @@
 {
   "name": "@argorix/sdk",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Official Argorix SDK for Node.js and TypeScript runtimes",
   "type": "module",
   "main": "dist/index.js",
